@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>课程设置蓝图（已锁定）· Web3 交易所全栈 0→8</title>
+<style>
+  :root{
+    --bg:#fff; --fg:#1f2933; --muted:#5b6b7b; --line:#e3e8ee;
+    --accent:#2563eb; --accent-soft:#eaf1ff; --warn:#b45309; --warn-soft:#fff4e0;
+    --ok:#047857; --ok-soft:#e7f6ef; --code-bg:#f6f8fa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;line-height:1.7;font-size:15px}
+  .wrap{max-width:980px;margin:0 auto;padding:36px 28px 72px}
+  h1{font-size:25px;margin:0 0 6px}
+  h2{font-size:20px;margin:36px 0 12px;padding-bottom:7px;border-bottom:2px solid var(--accent);color:var(--accent)}
+  h3{font-size:16px;margin:20px 0 8px;color:#0f2d52}
+  p{margin:8px 0}
+  .sub{color:var(--muted);margin-top:0}
+  .diagram{background:#fafcff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:16px 0;text-align:center}
+  .callout{border-left:4px solid var(--accent);background:var(--accent-soft);padding:11px 15px;border-radius:0 8px 8px 0;margin:14px 0}
+  .callout.warn{border-color:var(--warn);background:var(--warn-soft)}
+  .callout.ok{border-color:var(--ok);background:var(--ok-soft)}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 11px;text-align:left;vertical-align:top}
+  th{background:var(--accent-soft);color:#0f2d52;font-weight:600}
+  tr:nth-child(even) td{background:#fafcff}
+  .tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent);margin-right:6px}
+  .tag.opt{background:var(--warn-soft);color:var(--warn)}
+  .tag.lock{background:var(--ok-soft);color:var(--ok)}
+  ol,ul{padding-left:22px} li{margin:5px 0}
+  .anatomy{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
+  .step{flex:1 1 160px;background:#fafcff;border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .step b{display:block;color:var(--accent);margin-bottom:4px;font-size:13px}
+  .step span{font-size:13px;color:var(--muted)}
+  .foot{margin-top:48px;color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>课程设置蓝图（已锁定）</h1>
+<p class="sub">课题：从 0 用 Go（Gin）跑通 Web3 交易所后端 · 内容 spine = 全栈进阶 0→8 · 生产扩展留到 B 之后</p>
+
+<div class="callout ok">
+<b>已按你的指令锁定：</b>① 核心内容 = Web3 全栈进阶 <b>0→8</b>（不再是泛泛的「学 Go」）；② HTTP 框架 <b>用 Gin</b>；③ <b>先跑完核心主线（B）再进生产扩展（C）</b>。Go 基础不单独成阶段，融入 Phase 0 按需补强。
+</div>
+
+<!-- ===== 整体流程 ===== -->
+<h2>一、课程跑通的整体流程（端到端最小闭环）</h2>
+<p>Phase 0 用「mock 链上」跑通闭环；Phase 4–6 把 mock 换成真实链上交互。整条链路是后面每个模块要补的拼图。</p>
+<div class="diagram">
+<svg viewBox="0 0 720 300" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,PingFang SC,sans-serif">
+  <defs><marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <rect x="20" y="125" width="96" height="50" rx="8" fill="#eaf1ff" stroke="#2563eb"/>
+  <text x="68" y="146" text-anchor="middle" font-size="12" fill="#0f2d52">客户端</text>
+  <text x="68" y="163" text-anchor="middle" font-size="10" fill="#5b6b7b">Web/App</text>
+  <rect x="150" y="120" width="120" height="60" rx="8" fill="#eaf1ff" stroke="#2563eb"/>
+  <text x="210" y="143" text-anchor="middle" font-size="12" fill="#0f2d52">API 网关</text>
+  <text x="210" y="160" text-anchor="middle" font-size="10" fill="#5b6b7b">Gin + JWT 中间件</text>
+  <rect x="310" y="30" width="140" height="54" rx="8" fill="#e7f6ef" stroke="#047857"/>
+  <text x="380" y="50" text-anchor="middle" font-size="12" fill="#04402a">账户 / 账务</text>
+  <text x="380" y="67" text-anchor="middle" font-size="10" fill="#04402a">内部账本(decimal)</text>
+  <rect x="310" y="100" width="140" height="54" rx="8" fill="#e7f6ef" stroke="#047857"/>
+  <text x="380" y="120" text-anchor="middle" font-size="12" fill="#04402a">撮合引擎</text>
+  <text x="380" y="137" text-anchor="middle" font-size="10" fill="#04402a">single-writer</text>
+  <rect x="310" y="170" width="140" height="50" rx="8" fill="#fff4e0" stroke="#b45309"/>
+  <text x="380" y="190" text-anchor="middle" font-size="12" fill="#7c3f00">充值(Phase 4 真实链)</text>
+  <text x="380" y="207" text-anchor="middle" font-size="10" fill="#7c3f00">0 用 mock</text>
+  <rect x="310" y="235" width="140" height="50" rx="8" fill="#fff4e0" stroke="#b45309"/>
+  <text x="380" y="255" text-anchor="middle" font-size="12" fill="#7c3f00">提现(Phase 5 真实链)</text>
+  <text x="380" y="272" text-anchor="middle" font-size="10" fill="#7c3f00">0 用 mock</text>
+  <rect x="500" y="120" width="120" height="60" rx="8" fill="#f1f5f9" stroke="#94a3b8"/>
+  <text x="560" y="143" text-anchor="middle" font-size="12" fill="#334155">对账</text>
+  <text x="560" y="160" text-anchor="middle" font-size="10" fill="#334155">Phase 6 链上</text>
+  <line x1="116" y1="150" x2="148" y2="150" stroke="#475569" marker-end="url(#ar)"/>
+  <line x1="270" y1="150" x2="308" y2="57" stroke="#475569" marker-end="url(#ar)"/>
+  <line x1="270" y1="150" x2="308" y2="127" stroke="#475569" marker-end="url(#ar)"/>
+  <line x1="270" y1="150" x2="308" y2="195" stroke="#475569" marker-end="url(#ar)"/>
+  <line x1="270" y1="150" x2="308" y2="260" stroke="#475569" marker-end="url(#ar)"/>
+  <line x1="450" y1="57" x2="498" y2="140" stroke="#475569" marker-end="url(#ar)"/>
+  <line x1="450" y1="127" x2="498" y2="142" stroke="#475569" marker-end="url(#ar)"/>
+  <line x1="450" y1="195" x2="498" y2="155" stroke="#475569" marker-end="url(#ar)"/>
+  <line x1="450" y1="260" x2="498" y2="160" stroke="#475569" marker-end="url(#ar)"/>
+</svg>
+</div>
+
+<!-- ===== 每课怎么教 ===== -->
+<h2>二、每课教学结构（先图后码，不堆代码）</h2>
+<div class="anatomy">
+  <div class="step"><b>① 流程图</b><span>本课要建/改的组件、数据流（SVG 图优先）</span></div>
+  <div class="step"><b>② 整体思考</b><span>为什么这么设计、边界、前端类比</span></div>
+  <div class="step"><b>③ 引导敲码</b><span>分小步给目标+提示，不直接给大块答案</span></div>
+  <div class="step"><b>④ 跑通校验</b><span>怎么确认这一步对了</span></div>
+  <div class="step"><b>⑤ 生产 reality</b><span>⚠️ 可选：真实坑+方案，你决定是否展开</span></div>
+</div>
+<div class="callout">红线：<b>不出现大块代码</b>。需要给代码时，拆成「目标 → 提示 → 关键片段」，让你自己拼起来，避免陷入抄码丢掉整体思考。</div>
+
+<!-- ===== 模块树 ===== -->
+<h2>三、模块树</h2>
+
+<h3><span class="tag lock">核心主线 B</span> Web3 全栈进阶 0→8（先跑通）</h3>
+<table>
+  <thead><tr><th>Phase</th><th>目标</th><th>在整体流程中的位置</th></tr></thead>
+  <tbody>
+    <tr><td>0 巩固 CEX</td><td>Go 基础补强（按需）+ CEX 核心闭环：Gin 服务、JWT、账务 decimal、撮合 single-writer、充值/提现 mock、对账</td><td>全链路（链上先 mock）</td></tr>
+    <tr><td>1 区块链基础</td><td>账户模型、交易生命周期、gas/nonce、reorg、ERC-20、EIP-1559/712（后端视角，不打合约）</td><td>认知层</td></tr>
+    <tr><td>2 Go 链上交互</td><td>go-ethereum、RPC、读区块/交易/事件日志</td><td>接入链</td></tr>
+    <tr><td>3 钱包与密钥</td><td>HD 钱包(BIP32/39/44)、充值地址分配、热/冷、KMS 托管</td><td>资产安全</td></tr>
+    <tr><td>4 充值 Worker</td><td>扫区块 → 解析 Transfer → 内部入账（真实链，替换 Phase 0 mock）</td><td>充值链路</td></tr>
+    <tr><td>5 提现 Pipeline</td><td>构造 → KMS 签名 → 广播 → 确认 → reorg 处理（替换 mock）</td><td>提现链路</td></tr>
+    <tr><td>6 链上对账</td><td>内部账本 vs 链上收支一致性</td><td>对账</td></tr>
+    <tr><td>7 前端 Web3</td><td>wagmi/viem、钱包登录(EIP-712)、状态展示</td><td>客户端</td></tr>
+    <tr><td>8 端到端闭环</td><td>最小可演示项目：充值→余额→下单→撮合→提现 全跑通</td><td>收口</td></tr>
+  </tbody>
+</table>
+
+<h3><span class="tag opt">生产扩展 C</span> B 全跑完再进（可选深挖，最简逻辑）</h3>
+<table>
+  <thead><tr><th>模块</th><th>最简引入方式</th></tr></thead>
+  <tbody>
+    <tr><td>C1 幂等（Idempotency-Key）</td><td>防重复下单 / 重复提现</td></tr>
+    <tr><td>C2 风控中间件</td><td>限频（≈throttle）/ 额度 / 拦截</td></tr>
+    <tr><td>C3 Redis</td><td>缓存 / 限流计数 / 会话，只演示最简用法</td></tr>
+    <tr><td>C4 Kafka</td><td>成交事件 / 对账流异步解耦，最简 producer/consumer</td></tr>
+    <tr><td>C5 链上安全专题</td><td>reorg 深度 / nonce 竞争 / 冷热钱包 / 节点故障</td></tr>
+  </tbody>
+</table>
+
+<div class="callout"><b>Gin 落点：</b>Phase 0 起 HTTP 服务即用 Gin（handler≈前端 controller，middleware≈Express/Koa 中间件，JWT 中间件≈路由守卫）。<br/>
+<b>B 先于 C：</b>先把 0→8 主线跑通，Redis/Kafka/风控/幂等 全部留到 C 阶段集中深挖，不挤占主线权重。</div>
+
+<!-- ===== 确认 ===== -->
+<h2>四、状态</h2>
+<ul>
+  <li>✅ 内容 spine = Web3 全栈 0→8（已锁定）</li>
+  <li>✅ HTTP 框架 = Gin（已确认）</li>
+  <li>✅ 扩展节奏 = B 全跑完再进 C（已确认）</li>
+  <li>✅ 教学风格 = 先流程图 → 思考 → 引导小步敲码 → 校验 → 可选生产扩展（已锁定）</li>
+</ul>
+<div class="callout ok">以上即最终课程设置。<b>你回一句「开始」或类似确认，我就从 Phase 0 第一课（CEX 后端全景 + 起一个 Go/Gin 服务）生成，存进 <code>lessons/</code>。</b></div>
+
+<div class="foot">配套工作区：MISSION.md（目标/参数）、NOTES.md（教学偏好，已含本次锁定项）、RESOURCES.md（资源待补）、lessons/（课程页）、reference/、learning-records/、assets/。</div>
+
+</div>
+</body>
+</html>
