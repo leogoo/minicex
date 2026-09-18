@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>0001 · CEX 后端全景 + 起一个 Go/Gin 服务</title>
+<title>第 1 课 · CEX 后端全景 + 起一个 Go/Gin 服务</title>
 <style>
   :root{
     --bg:#fff; --fg:#1f2933; --muted:#5b6b7b; --line:#e3e8ee;
@@ -12,211 +12,167 @@
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;line-height:1.7;font-size:15px}
-  .wrap{max-width:920px;margin:0 auto;padding:34px 26px 70px}
-  h1{font-size:24px;margin:0 0 4px}
-  .ph{font-size:13px;color:var(--accent);font-weight:600;letter-spacing:.5px}
-  h2{font-size:19px;margin:32px 0 10px;padding-bottom:6px;border-bottom:2px solid var(--accent);color:var(--accent)}
-  h3{font-size:15px;margin:18px 0 6px;color:#0f2d52}
+  .wrap{max-width:980px;margin:0 auto;padding:36px 28px 72px}
+  h1{font-size:25px;margin:0 0 6px}
+  h2{font-size:20px;margin:36px 0 12px;padding-bottom:7px;border-bottom:2px solid var(--accent);color:var(--accent)}
+  h3{font-size:16px;margin:20px 0 8px;color:#0f2d52}
   p{margin:8px 0}
   .sub{color:var(--muted);margin-top:0}
-  .diagram{background:#fafcff;border:1px solid var(--line);border-radius:12px;padding:14px;margin:14px 0;text-align:center}
-  .callout{border-left:4px solid var(--accent);background:var(--accent-soft);padding:11px 14px;border-radius:0 8px 8px 0;margin:12px 0}
+  .diagram{background:#fafcff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:16px 0;text-align:center}
+  .callout{border-left:4px solid var(--accent);background:var(--accent-soft);padding:11px 15px;border-radius:0 8px 8px 0;margin:14px 0}
   .callout.warn{border-color:var(--warn);background:var(--warn-soft)}
   .callout.ok{border-color:var(--ok);background:var(--ok-soft)}
-  pre{background:var(--code-bg);color:#24292f;padding:12px 14px;border-radius:10px;overflow-x:auto;border:1px solid var(--line);font-size:12.5px}
-  code{background:var(--code-bg);color:#24292f;padding:1px 6px;border-radius:4px;font-size:12.5px;font-family:"SFMono-Regular",Consolas,Menlo,monospace}
-  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.5px}
-  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 11px;text-align:left;vertical-align:top}
   th{background:var(--accent-soft);color:#0f2d52;font-weight:600}
   tr:nth-child(even) td{background:#fafcff}
-  .tree{background:#0f172a;color:#e2e8f0;padding:14px 16px;border-radius:10px;font-family:"SFMono-Regular",Consolas,Menlo,monospace;font-size:12.5px;line-height:1.6;white-space:pre;overflow-x:auto}
-  .tree .c{color:#7dd3fc}
-  .tree .m{color:#94a3b8}
-  .step{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:10px 0;background:#fff}
-  .step .h{font-weight:600;color:var(--accent);margin-bottom:4px}
-  .step .path{font-family:"SFMono-Regular",Consolas,Menlo,monospace;font-size:12.5px;background:var(--accent-soft);color:#0f2d52;padding:1px 6px;border-radius:4px}
-  .tag{display:inline-block;font-size:11px;padding:2px 7px;border-radius:999px;background:var(--accent-soft);color:var(--accent);margin-right:6px}
+  .tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent);margin-right:6px}
   .tag.opt{background:var(--warn-soft);color:var(--warn)}
-  a{color:var(--accent)}
-  .foot{margin-top:44px;color:var(--muted);font-size:12.5px;border-top:1px solid var(--line);padding-top:12px}
+  .tag.lock{background:var(--ok-soft);color:var(--ok)}
+  ol,ul{padding-left:22px} li{margin:5px 0}
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;font-size:13px;line-height:1.5}
+  code{font-family:"SFMono-Regular",Consolas,Menlo,monospace}
+  .foot{margin-top:48px;color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:14px}
+  .path{font-family:monospace;background:var(--code-bg);padding:1px 6px;border-radius:4px;color:#0f2d52}
 </style>
 </head>
 <body>
 <div class="wrap">
 
-<div class="ph">PHASE 0 · LESSON 1 / 9</div>
-<h1>CEX 后端全景 + 起一个 Go/Gin 服务</h1>
-<p class="sub">本课目标：在 <code>Documents/leo/minicex/project</code> 跑通一个最小 Gin 服务，并建立对「交易所后端由哪些模块拼成」的整体认知。</p>
+<h1>第 1 课 · CEX 后端全景 + 起一个 Go/Gin 服务</h1>
+<p class="sub">Phase 0 巩固 CEX · 本课只搭骨架：一个 Gin 服务 + <span class="path">/ping</span>。其余模块在后面逐课补。</p>
 
-<div class="callout ok"><b>学完你将拥有：</b>① 一个能 <code>go run</code> 起来的 Gin 项目骨架；② 一张记在脑子里的 CEX 后端全景图；③ 后续每节课往这张图里补一块拼图的心智模型。</div>
+<div class="callout ok">
+<b>本课目标：</b>跑通「一个能响应的 Go/Gin HTTP 服务」。先建立心智——后面每一课都是在下面这张全景图里<strong>补一块拼图</strong>，而不是另起炉灶。
+</div>
 
-<!-- ===== 流程图 ===== -->
-<h2>一、先看全景（这节课要补哪块）</h2>
-<p>下面的图是整个交易所后端。本课你只搭最左边的<strong>网关骨架</strong>和一个 <code>/ping</code> 接口；其余模块在 Phase 0 后续课与 Phase 4–6 逐步补上（充值/提现本课先用 mock 占位）。</p>
+<!-- ===== ① 流程图 ===== -->
+<h2>① 全景流程图（本课只点亮灰色那块）</h2>
 <div class="diagram">
-<svg viewBox="0 0 720 250" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,PingFang SC,sans-serif">
+<svg viewBox="0 0 720 280" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,PingFang SC,sans-serif">
   <defs><marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
-  <rect x="20" y="100" width="92" height="46" rx="8" fill="#eaf1ff" stroke="#2563eb"/>
-  <text x="66" y="120" text-anchor="middle" font-size="12" fill="#0f2d52">客户端</text>
-  <text x="66" y="137" text-anchor="middle" font-size="10" fill="#5b6b7b">Web/App</text>
+  <rect x="20" y="115" width="90" height="50" rx="8" fill="#eef2f7" stroke="#94a3b8"/>
+  <text x="65" y="138" text-anchor="middle" font-size="12" fill="#334155">客户端</text>
+  <text x="65" y="155" text-anchor="middle" font-size="10" fill="#64748b">Web/App</text>
 
-  <!-- 本课：网关骨架 高亮 -->
-  <rect x="150" y="95" width="130" height="56" rx="8" fill="#fff4e0" stroke="#b45309" stroke-width="2"/>
-  <text x="215" y="118" text-anchor="middle" font-size="12" fill="#7c3f00">API 网关(本课)</text>
-  <text x="215" y="135" text-anchor="middle" font-size="10" fill="#7c3f00">Gin + /ping</text>
+  <rect x="145" y="108" width="120" height="64" rx="8" fill="#eaf1ff" stroke="#2563eb" stroke-width="2"/>
+  <text x="205" y="131" text-anchor="middle" font-size="12" fill="#0f2d52" font-weight="bold">API 网关</text>
+  <text x="205" y="148" text-anchor="middle" font-size="10" fill="#2563eb">Gin + /ping</text>
+  <text x="205" y="163" text-anchor="middle" font-size="9" fill="#5b6b7b">← 本课点亮</text>
 
-  <rect x="320" y="20" width="140" height="48" rx="8" fill="#f1f5f9" stroke="#cbd5e1"/>
-  <text x="390" y="40" text-anchor="middle" font-size="11" fill="#475569">账户/账务(后续)</text>
-  <text x="390" y="56" text-anchor="middle" font-size="10" fill="#94a3b8">decimal 账本</text>
+  <rect x="300" y="40" width="120" height="50" rx="8" fill="#f1f5f9" stroke="#cbd5e1"/>
+  <text x="360" y="62" text-anchor="middle" font-size="11" fill="#475569">账户 / 账务</text>
+  <rect x="300" y="110" width="120" height="50" rx="8" fill="#f1f5f9" stroke="#cbd5e1"/>
+  <text x="360" y="132" text-anchor="middle" font-size="11" fill="#475569">撮合引擎</text>
+  <rect x="300" y="180" width="120" height="50" rx="8" fill="#f1f5f9" stroke="#cbd5e1"/>
+  <text x="360" y="202" text-anchor="middle" font-size="11" fill="#475569">充值</text>
+  <rect x="455" y="110" width="120" height="50" rx="8" fill="#f1f5f9" stroke="#cbd5e1"/>
+  <text x="515" y="132" text-anchor="middle" font-size="11" fill="#475569">提现</text>
+  <rect x="610" y="110" width="90" height="50" rx="8" fill="#f1f5f9" stroke="#cbd5e1"/>
+  <text x="655" y="132" text-anchor="middle" font-size="11" fill="#475569">对账</text>
 
-  <rect x="320" y="82" width="140" height="48" rx="8" fill="#f1f5f9" stroke="#cbd5e1"/>
-  <text x="390" y="102" text-anchor="middle" font-size="11" fill="#475569">撮合引擎(后续)</text>
-  <text x="390" y="118" text-anchor="middle" font-size="10" fill="#94a3b8">single-writer</text>
-
-  <rect x="320" y="144" width="140" height="44" rx="8" fill="#f1f5f9" stroke="#cbd5e1"/>
-  <text x="390" y="162" text-anchor="middle" font-size="11" fill="#475569">充值/提现(mock)</text>
-  <text x="390" y="178" text-anchor="middle" font-size="10" fill="#94a3b8">Phase 4–5 换真链</text>
-
-  <rect x="510" y="95" width="150" height="56" rx="8" fill="#f1f5f9" stroke="#cbd5e1"/>
-  <text x="585" y="118" text-anchor="middle" font-size="11" fill="#475569">对账(后续)</text>
-  <text x="585" y="135" text-anchor="middle" font-size="10" fill="#94a3b8">Phase 6 链上</text>
-
-  <line x1="112" y1="123" x2="148" y2="123" stroke="#475569" marker-end="url(#ar)"/>
-  <line x1="280" y1="123" x2="318" y2="44" stroke="#94a3b8" stroke-dasharray="4 3" marker-end="url(#ar)"/>
-  <line x1="280" y1="123" x2="318" y2="106" stroke="#94a3b8" stroke-dasharray="4 3" marker-end="url(#ar)"/>
-  <line x1="280" y1="123" x2="318" y2="166" stroke="#94a3b8" stroke-dasharray="4 3" marker-end="url(#ar)"/>
-  <line x1="460" y1="123" x2="508" y2="123" stroke="#94a3b8" stroke-dasharray="4 3" marker-end="url(#ar)"/>
+  <line x1="110" y1="140" x2="143" y2="140" stroke="#475569" marker-end="url(#ar)"/>
+  <line x1="265" y1="135" x2="298" y2="65" stroke="#cbd5e1" stroke-dasharray="4 3"/>
+  <line x1="265" y1="140" x2="298" y2="135" stroke="#cbd5e1" stroke-dasharray="4 3"/>
+  <line x1="265" y1="145" x2="298" y2="205" stroke="#cbd5e1" stroke-dasharray="4 3"/>
+  <line x1="420" y1="135" x2="453" y2="135" stroke="#cbd5e1" stroke-dasharray="4 3"/>
+  <line x1="575" y1="135" x2="608" y2="135" stroke="#cbd5e1" stroke-dasharray="4 3"/>
 </svg>
 </div>
+<p>灰色模块（账户/撮合/充值/提现/对账）本课<strong>不实现</strong>，但先记住它们都会挂在「API 网关」后面。你每跑通一课，就点亮一块。</p>
 
-<!-- ===== 整体思考 ===== -->
-<h2>二、整体思考（先理解，再敲）</h2>
+<!-- ===== ② 整体思考 ===== -->
+<h2>② 整体思考（先想清楚再敲）</h2>
+<h3>为什么用 Gin？</h3>
+<p>你是前端，Gin 类比一下就懂：</p>
+<table>
+<tr><th>Go / Gin</th><th>前端对应</th><th>作用</th></tr>
+<tr><td><code>gin.New()</code> / <code>gin.Default()</code></td><td><code>const app = express()</code></td><td>创建应用实例</td></tr>
+<tr><td><code>r.GET("/x", h)</code></td><td><code>app.get("/x", h)</code></td><td>注册路由</td></tr>
+<tr><td><code>gin.Context</code></td><td>请求上下文 <code>ctx</code> / <code>req+res</code></td><td>一次请求的输入输出</td></tr>
+<tr><td><code>r.Use(mw)</code></td><td><code>app.use(mw)</code> 中间件</td><td>横切逻辑（日志/鉴权）</td></tr>
+<tr><td><code>c.JSON(200, x)</code></td><td><code>res.json(x)</code></td><td>返回 JSON</td></tr>
+</table>
+<div class="callout">
+<strong>关键心智：</strong>Gin 的 handler 就相当于你熟悉的 <strong>controller / route handler</strong>；middleware 和 Express/Koa 中间件一模一样。你不是从零学 web，是把已有心智映射到 Go 语法。
+</div>
+
+<h3>main.go 应该保持很小</h3>
+<p>新手常把路由、业务逻辑、配置全塞进 <code>main.go</code>。本课允许（因为只有 /ping），但记住纪律：<strong>main 只做「装配」</strong>——创建服务、挂路由、启动。业务逻辑往后要挪进 <code>internal/</code>。第 2 课就动手分层。</p>
+
+<!-- ===== ③ 引导敲码 ===== -->
+<h2>③ 引导敲码（分 5 小步，每步只给目标 + 提示）</h2>
+<p>本课只在项目根建两个文件：<span class="path">project/go.mod</span> 和 <span class="path">project/main.go</span>。</p>
+
+<div class="callout warn"><b>要求：</b>下面每一步的「目标」你要自己敲出来。唯一需要你写代码的是第 4 步（hello-world 量级）。<strong>敲的时候想清楚每一行对应流程图里哪一块。</strong></div>
+
+<h3>Step 1 — 建目录 & 初始化模块</h3>
 <ul>
-  <li><b>为什么用 Gin？</b> 它就是一个「路由 + 中间件」的 Web 框架，和你在前端用过的 <code>Express</code> / <code>Koa</code> 心智几乎一致。本课先把「HTTP 服务能起来」这关过了，后面所有模块（账户、撮合、充值）都挂在这个服务上。</li>
-  <li><b>前端类比（务必记住，后面反复用）：</b>
-    <table>
-      <thead><tr><th>Go / Gin</th><th>前端等价物</th></tr></thead>
-      <tbody>
-        <tr><td><code>gin.Engine</code></td><td>Koa <code>app</code> / Express <code>app</code></td></tr>
-        <tr><td><code>r.GET("/x", h)</code></td><td><code>app.get('/x', h)</code></td></tr>
-        <tr><td><code>gin.Context</code></td><td><code>ctx</code>（req+res 合一）</td></tr>
-        <tr><td>middleware</td><td>Koa middleware（后续放 JWT 鉴权）</td></tr>
-        <tr><td><code>r.Run()</code></td><td><code>app.listen()</code></td></tr>
-      </tbody>
-    </table>
-  </li>
-  <li><b>main.go 应该很小。</b> 本课为了跑通先平铺，但从下一课起我们会把代码拆进 <code>internal/</code> 按职责分层（这是 Go 项目的标准做法，也是你简历上「会组织后端工程」的体现）。</li>
+<li><b>目标：</b>进入 <span class="path">minicex/project</span>，让 Go 把它当一个 module。</li>
+<li><b>提示：</b>执行 <code>go mod init minicex</code>。会生成 <span class="path">go.mod</span>。module 名用 <code>minicex</code> 即可（本地产练习，不要域名）。</li>
+<li><b>校验：</b>目录里出现 <span class="path">go.mod</span>，内容含 <code>module minicex</code>。</li>
 </ul>
 
-<!-- ===== 文件结构 ===== -->
-<h2>三、本节课要创建的文件结构</h2>
-<p>本课只新建两个文件，项目还很扁平。先跑通，再在后续课里重构出分层结构。</p>
-<div class="tree"><span class="c">Documents/leo/minicex/project/</span>
-├── <span class="m">go.mod</span>      <span class="m"># 由 `go mod init` 生成（模块定义）</span>
-└── <span class="m">main.go</span>     <span class="m"># 本节课唯一要手写的代码</span></div>
+<h3>Step 2 — 拉 Gin 依赖</h3>
+<ul>
+<li><b>目标：</b>让项目能用 <code>github.com/gin-gonic/gin</code>。</li>
+<li><b>提示：</b>执行 <code>go get github.com/gin-gonic/gin</code>。Go 会自动把依赖写进 <span class="path">go.mod</span> / <span class="path">go.sum</span>。</li>
+</ul>
 
-<div class="callout"><b>Phase 0 结束时的目标结构（你心里先有数，不用现在建）：</b>
-<div class="tree"><span class="c">project/</span>
-├── go.mod
-├── cmd/server/main.go        <span class="m"># 入口（极薄）</span>
-└── internal/
-    ├── http/                 <span class="m"># Gin 路由 + handler + 中间件</span>
-    │   ├── router.go
-    │   ├── middleware/auth.go
-    │   └── handler/...
-    ├── account/              <span class="m"># 账户与账务（decimal 账本）</span>
-    ├── match/                <span class="m"># 撮合引擎</span>
-    └── deposit/              <span class="m"># 充值（mock）/ 提现（mock）</span></div>
-</div>
+<h3>Step 3 — 想清楚 main.go 要做什么</h3>
+<ul>
+<li>创建 Gin 引擎；</li>
+<li>注册一条 <code>GET /ping</code> 路由，返回 <code>{"message":"pong"}</code>；</li>
+<li>启动在 <code>:8080</code>。</li>
+</ul>
 
-<!-- ===== 引导敲码 ===== -->
-<h2>四、引导敲码（你来做，我给路径+提示）</h2>
-
-<div class="step">
-  <div class="h">步骤 1 · 建项目目录</div>
-  <p>在终端执行（这就是课程根下的项目目录）：</p>
-  <pre>mkdir -p ~/Documents/leo/minicex/project
-cd ~/Documents/leo/minicex/project</pre>
-  <p><b>目标：</b> 终端当前目录停在 <code>project/</code> 里。</p>
-</div>
-
-<div class="step">
-  <div class="h">步骤 2 · 初始化 Go module</div>
-  <p>仍在 <code>project/</code> 目录：</p>
-  <pre>go mod init minicex</pre>
-  <p><b>提示：</b> <code>minicex</code> 是模块名，相当于这个项目的「包名前缀」。执行后会生成 <span class="path">go.mod</span>。</p>
-  <p><b>校验：</b> <code>ls</code> 能看到 <code>go.mod</code>。</p>
-</div>
-
-<div class="step">
-  <div class="h">步骤 3 · 引入 Gin 依赖</div>
-  <pre>go get github.com/gin-gonic/gin</pre>
-  <p><b>提示：</b> 这一步会联网拉 Gin 并写进 <code>go.mod</code> 和新建 <code>go.sum</code>（依赖锁）。若你的环境有 Go 版本要求，留意终端报错——Go 1.16+ 都用这条。</p>
-</div>
-
-<div class="step">
-  <div class="h">步骤 4 · 写 <span class="path">Documents/leo/minicex/project/main.go</span></div>
-  <p><b>目标：</b> 一个 Gin 服务，监听 <code>:8080</code>，响应 <code>GET /ping</code> 返回 JSON <code>{"message":"pong"}</code>。</p>
-  <p><b>提示（不要直接抄，先想每行在干嘛）：</b></p>
-  <pre>package main
+<h3>Step 4 — 手写 main.go（本课唯一需要你写的代码）</h3>
+<ul>
+<li><b>骨架提示（按这个结构补，不要抄一大段）：</b></li>
+</ul>
+<pre><code>package main
 
 import "github.com/gin-gonic/gin"
 
 func main() {
-    r := gin.Default()           // 1) 创建一个引擎（≈ Koa app）
+    r := gin.Default()          // 创建引擎（≈ express()）
     r.GET("/ping", func(c *gin.Context) {
-        c.JSON(200, gin.H{"message": "pong"}) // 2) 返回 JSON
+        c.JSON(200, gin.H{       // gin.H 就是 map[string]interface{}
+            "message": "pong",
+        })
     })
-    r.Run(":8080")              // 3) 启动并监听 8080
-}</pre>
-  <p><b>关键片段拆解：</b></p>
-  <ul>
-    <li><code>gin.Default()</code> 带默认日志/恢复中间件，先用着；</li>
-    <li><code>gin.H{...}</code> 是 <code>map[string]interface{}</code> 的简写，专门给 JSON 用；</li>
-    <li><code>c.JSON(code, obj)</code> 同时设了 <code>Content-Type</code> 和状态码——和前端 <code>res.json()</code> 一个意思。</li>
-  </ul>
-  <p class="callout warn" style="margin-top:8px">红灯提醒：本技能约定「不堆大块代码」。上面这段是本课唯一的手写文件，且是 hello-world 量级，所以完整给出——但你要<strong>自己敲一遍</strong>，每敲一行想清楚它在图里对应哪一块。</p>
-</div>
+    r.Run(":8080")               // 启动监听
+}</code></pre>
+<div class="callout"><b>敲完问自己：</b>这一行 <code>r.GET("/ping", ...)</code> 在流程图里是哪一块？它把「客户端请求」连到了哪个「处理动作」？</div>
 
-<div class="step">
-  <div class="h">步骤 5 · 运行</div>
-  <pre>go run main.go</pre>
-  <p><b>提示：</b> 终端应打印 <code>Listening and serving HTTP on :8080</code>。它<strong>阻塞在前台</strong>，别关。</p>
-</div>
-
-<!-- ===== 跑通校验 ===== -->
-<h2>五、跑通校验</h2>
-<p>另开一个终端，打请求（或用浏览器开 <code>http://localhost:8080/ping</code>）：</p>
-<pre>curl http://localhost:8080/ping</pre>
-<p><b>预期返回：</b></p>
-<pre>{"message":"pong"}</code></pre>
-<div class="callout ok">看到这段 JSON，本课满分通过 ✅。你现在已经有了「交易所后端」的第一个进程——后续所有模块都挂在这个 Gin 服务上。</div>
-
-<!-- ===== 生产 reality ===== -->
-<h2>六、生产 reality（⚠️ 可选，先不深究）</h2>
-<p>真实交易所的后端比这复杂得多，但你<strong>现在不用管</strong>，知道有这些坑即可，等 Phase 0–8 跑通后再说：</p>
-<table>
-  <thead><tr><th>本课最简</th><th>生产环境实际做法</th></tr></thead>
-  <tbody>
-    <tr><td><code>r.Run()</code> 前台阻塞</td><td>用 <code>http.Server</code> + <code>Shutdown()</code> 做优雅退出，收到信号先处理完在途请求</td></tr>
-    <tr><td>单进程平铺</td><td>REST/WS 网关 + 内部 gRPC 微服务（账户/撮合/清算分服务）</td></tr>
-    <tr><td>无配置</td><td>配置走 <code>viper</code>（环境变量 / 文件），端口、DB、链 RPC 都外部化</td></tr>
-    <tr><td>无日志</td><td>结构化日志 <code>slog</code> / <code>zap</code>，关键动作全留痕（风控审计要）</td></tr>
-  </tbody>
-</table>
-<p class="callout warn" style="margin-top:8px">这些属于「生产扩展 C 阶段」范畴。本课只求<strong>跑通</strong>，别被它们带偏。</p>
-
-<!-- ===== 推荐资料 + 问老师 ===== -->
-<h2>七、推荐资料 & 下一步</h2>
+<h3>Step 5 — 跑起来</h3>
 <ul>
-  <li>📘 Gin 官方文档（Quickstart）：<a href="https://gin-gonic.com/docs/quickstart/" target="_blank">gin-gonic.com/docs/quickstart</a></li>
-  <li>📘 Go 官方 Tour（补 Go 语法，按需）：<a href="https://go.dev/tour/" target="_blank">go.dev/tour</a></li>
+<li><b>命令：</b><code>go run .</code>（在 <span class="path">project</span> 目录下）。</li>
+<li>看到 <code>Listening and serving HTTP on :8080</code> 即成功，终端会阻塞——这是正常的，<kbd>Ctrl+C</kbd> 退出。</li>
 </ul>
-<p><b>下一课预告：</b> Phase 0 · Lesson 2 —— 账户与账务：用 <code>decimal</code> 建一个内部账本（为什么金额绝不用 <code>float</code>），并把 <code>main.go</code> 重构成 <code>cmd/server</code> + <code>internal/</code> 分层。</p>
-<div class="callout"><b>有疑问就问老师（也就是我）。</b> 比如：Go 的 <code>package main</code> 是什么意思？<code>gin.H</code> 为什么能直接当 JSON？哪里卡住就问，别硬扛。</div>
 
-<div class="foot">本课文件：lessons/0001-cex-panorama-gin-service.html · 项目根：Documents/leo/minicex/project · 课程总纲见 course-setup.html</div>
+<!-- ===== ④ 跑通校验 ===== -->
+<h2>④ 跑通校验</h2>
+<p>另开一个终端，确认服务真的在响应：</p>
+<pre><code>curl localhost:8080/ping
+# 期望输出：
+# {"message":"pong"}</code></pre>
+<div class="callout ok"><b>跑通标准：</b>浏览器或 curl 访问 <span class="path">/ping</span> 返回 <code>{"message":"pong"}</code>。✅ 第一课完成。</div>
 
+<!-- ===== ⑤ 生产 reality ===== -->
+<h2>⑤ 生产 reality（⚠️ 可选扩展，不转移主线）</h2>
+<div class="callout warn">以下都属于 <b>C 阶段</b>。本课只需跑通，知道「真实环境还会考虑这些」即可，<strong>不要现在深挖</strong>。</div>
+<ul>
+<li><b>优雅退出：</b>生产用 <code>r.Run</code> 不够，要监听 SIGTERM 平滑关连接（避免正在处理的请求被砍）。</li>
+<li><b>配置外部化：</b>端口、环境变量用 <code>viper</code> 或标准 <code>flag</code>/<code>os.Getenv</code>，不写死。</li>
+<li><b>结构化日志：</b>用 <code>log/slog</code> 代替 <code>fmt.Println</code>，方便 ELK 收集。</li>
+<li><b>微服务化：</b>真实交易所账户/撮合/风控是独立服务（gRPC 内通），不是单体 main。</li>
+<li><b>链路追踪：</b>OpenTelemetry 串联一次请求跨服务。</li>
+</ul>
+
+<div class="callout"><b>下一课（第 2 课）：</b>账户与账务——用 <code>decimal</code> 建内部账本，并把本课这个 <code>main.go</code> 重构成 <code>cmd/server</code> + <code>internal/</code> 分层结构。</div>
+
+<div class="foot">课程根：<span class="path">minicex/</span> · 代码目录：<span class="path">minicex/project/</span> · 本课文件：<span class="path">project/go.mod</span> + <span class="path">project/main.go</span></div>
 </div>
 </body>
 </html>

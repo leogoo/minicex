@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>第 4 课 · 撮合引擎入门 —— 价格交叉就成交，其余挂单</title>
+<style>
+  :root{
+    --bg:#fff; --fg:#1f2933; --muted:#5b6b7b; --line:#e3e8ee;
+    --accent:#2563eb; --accent-soft:#eaf1ff; --warn:#b45309; --warn-soft:#fff4e0;
+    --ok:#047857; --ok-soft:#e7f6ef; --code-bg:#f6f8fa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;line-height:1.7;font-size:15px}
+  .wrap{max-width:980px;margin:0 auto;padding:36px 28px 72px}
+  h1{font-size:25px;margin:0 0 6px}
+  h2{font-size:20px;margin:36px 0 12px;padding-bottom:7px;border-bottom:2px solid var(--accent);color:var(--accent)}
+  h3{font-size:16px;margin:20px 0 8px;color:#0f2d52}
+  p{margin:8px 0}
+  .sub{color:var(--muted);margin-top:0}
+  .diagram{background:#fafcff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:16px 0;text-align:center}
+  .callout{border-left:4px solid var(--accent);background:var(--accent-soft);padding:11px 15px;border-radius:0 8px 8px 0;margin:14px 0}
+  .callout.warn{border-color:var(--warn);background:var(--warn-soft)}
+  .callout.ok{border-color:var(--ok);background:var(--ok-soft)}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 11px;text-align:left;vertical-align:top}
+  th{background:var(--accent-soft);color:#0f2d52;font-weight:600}
+  tr:nth-child(even) td{background:#fafcff}
+  .tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent);margin-right:6px}
+  .tag.opt{background:var(--warn-soft);color:var(--warn)}
+  .tag.lock{background:var(--ok-soft);color:var(--ok)}
+  ol,ul{padding-left:22px} li{margin:5px 0}
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;font-size:13px;line-height:1.5}
+  code{font-family:"SFMono-Regular",Consolas,Menlo,monospace}
+  .foot{margin-top:48px;color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:14px}
+  .path{font-family:monospace;background:var(--code-bg);padding:1px 6px;border-radius:4px;color:#0f2d52}
+  .anatomy{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
+  .step{flex:1 1 150px;background:#fafcff;border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .step b{display:block;color:var(--accent);margin-bottom:4px;font-size:13px}
+  .step span{font-size:13px;color:var(--muted)}
+  .req{border-left:4px solid var(--ok);background:var(--ok-soft);padding:10px 14px;border-radius:0 8px 8px 0;margin:12px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>第 4 课 · 撮合引擎入门</h1>
+<p class="sub">Phase 0 巩固 CEX · 交易所的心脏：价格交叉就成交，没成交的挂进订单簿</p>
+
+<div class="callout ok">
+<b>本课目标：</b>理解并跑通一个<b>最小撮合引擎</b>——接收一笔订单，跟对手盘逐笔撮合，能成交的生成 <code>Trade</code>、不能成交的挂进订单簿。本课<b>只做撮合本身</b>，不碰「用户有没有钱」（那是提交订单之前、风控层的事，呼应你之前 review 的 <code>book.go</code> 边界）。
+</div>
+
+<!-- ===== ① 流程图 ===== -->
+<h2>① 流程图（本课点亮「撮合引擎」模块）</h2>
+<div class="diagram">
+<svg viewBox="0 0 720 320" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,PingFang SC,sans-serif">
+  <defs><marker id="ar4" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+
+  <rect x="20" y="135" width="90" height="50" rx="8" fill="#eef2f7" stroke="#94a3b8"/>
+  <text x="65" y="158" text-anchor="middle" font-size="12" fill="#334155">客户端</text>
+  <text x="65" y="175" text-anchor="middle" font-size="10" fill="#64748b">下单</text>
+
+  <rect x="135" y="135" width="110" height="50" rx="8" fill="#eaf1ff" stroke="#2563eb"/>
+  <text x="190" y="158" text-anchor="middle" font-size="11" fill="#0f2d52" font-weight="bold">API 网关</text>
+  <text x="190" y="175" text-anchor="middle" font-size="9" fill="#2563eb">Gin + Auth</text>
+
+  <rect x="280" y="125" width="130" height="70" rx="8" fill="#e7f6ef" stroke="#047857" stroke-width="2"/>
+  <text x="345" y="148" text-anchor="middle" font-size="11" fill="#0f2d52" font-weight="bold">撮合 Handler</text>
+  <text x="345" y="165" text-anchor="middle" font-size="9" fill="#047857">internal/match</text>
+  <text x="345" y="180" text-anchor="middle" font-size="9" fill="#5b6b7b">Submit(order)</text>
+
+  <rect x="445" y="115" width="155" height="90" rx="8" fill="#fff4e0" stroke="#b45309" stroke-width="2"/>
+  <text x="522" y="138" text-anchor="middle" font-size="11" fill="#0f2d52" font-weight="bold">撮合引擎 Book</text>
+  <text x="522" y="158" text-anchor="middle" font-size="9" fill="#b45309">bids 买盘(价降序)</text>
+  <text x="522" y="173" text-anchor="middle" font-size="9" fill="#b45309">asks 卖盘(价升序)</text>
+  <text x="522" y="188" text-anchor="middle" font-size="9" fill="#5b6b7b">交叉则成交</text>
+
+  <rect x="625" y="135" width="92" height="50" rx="8" fill="#f1f5f9" stroke="#cbd5e1"/>
+  <text x="671" y="158" text-anchor="middle" font-size="10" fill="#475569">成交 / 挂单</text>
+  <text x="671" y="175" text-anchor="middle" font-size="9" fill="#64748b">Trades</text>
+
+  <line x1="110" y1="160" x2="133" y2="160" stroke="#475569" stroke-width="1.5" marker-end="url(#ar4)"/>
+  <line x1="245" y1="160" x2="278" y2="160" stroke="#475569" stroke-width="1.5" marker-end="url(#ar4)"/>
+  <line x1="410" y1="160" x2="443" y2="160" stroke="#475569" stroke-width="1.5" marker-end="url(#ar4)"/>
+  <line x1="600" y1="160" x2="623" y2="160" stroke="#475569" stroke-width="1.5" marker-end="url(#ar4)"/>
+
+  <text x="360" y="262" text-anchor="middle" font-size="10" fill="#64748b">成交后「通知下游账务/风控」是后续阶段的事 —— 本课引擎只产出 Trade，不扣钱</text>
+  <text x="360" y="282" text-anchor="middle" font-size="10" fill="#b45309">边界：撮合只判断「价格能不能成交」，不判断「用户有没有钱」（资金校验在提交前由风控层做）</text>
+</svg>
+</div>
+
+<!-- ===== ② 整体思考 ===== -->
+<h2>② 整体思考（先想清楚再敲）</h2>
+
+<h3>撮合引擎到底在干嘛</h3>
+<p>一句话：<b>把「想买的人」和「想卖的人」按价格撮到一起</b>。它维护两个队列——<b>买盘 bids</b>（大家挂的买单）和 <b>卖盘 asks</b>（大家挂的卖单）。新订单进来时：</p>
+<ul>
+<li><b>买单</b>来价格 <code>P</code>：去卖盘找「价格 ≤ P」的卖单，从最便宜的开始逐笔吃（价格优先）。</li>
+<li><b>卖单</b>来价格 <code>P</code>：去买盘找「价格 ≥ P」的买单，从最贵（出价最高）的开始逐笔吃。</li>
+<li>吃的过程中每成交一笔，生成一个 <code>Trade</code>（成交记录）。</li>
+<li>主动单吃不完的部分，就挂进自己的盘，等后面的人来撮。</li>
+</ul>
+
+<table>
+  <tr><th>前端类比</th><th>撮合引擎对应</th><th>说明</th></tr>
+  <tr><td>事件队列 / 消息总线</td><td>订单流（不断进来的 order）</td><td>都是「来一个处理一个」</td></tr>
+  <tr><td>数组按字段 <code>sort</code> 后取极值</td><td>bids 降序 / asks 升序</td><td>价格优先 = 排序后从头取</td></tr>
+  <tr><td>reducer 产生新状态 + action 日志</td><td>Book 状态变化 + Trade 流水</td><td>成交可回放（类似 ledger）</td></tr>
+  <tr><td>纯函数（输入→输出，不改外部）</td><td>撮合核心 <code>Submit</code></td><td>理想情况下可单测、可回放</td></tr>
+</table>
+
+<h3>落点：为什么进 <code>internal/match</code></h3>
+<p>按第 2 课定的「模块式」约定，每个业务域一个包、自带 <code>{model,service/handler}</code> 并暴露 <code>RegisterRoutes</code>。撮合是独立业务域，所以住 <code>internal/match</code>，和账户、后续充值/提现平级。它<b>只依赖自己的内存订单簿</b>，不反向依赖账户——保持「引擎不知道钱」的干净边界（你之前 review <code>book.go</code> 时纠结的正是这点）。</p>
+
+<div class="callout warn"><b>关键边界（记牢，呼应 book.go）：</b>撮合引擎只回答两个问题 —— <b>① 这笔单能不能和现有盘口成交？② 成交了多少、价多少？</b> 它<b>不查余额、不扣钱、不拒「买不起」的订单</b>。判断「这个用户是否有权下这笔单」是<b>提交订单之前</b>风控层（C 阶段）的职责。把资金判断塞进撮合，就是越界。</div>
+
+<h3>本课先做什么、不做什么</h3>
+<ul>
+<li><b>做</b>：限价单（你挂一个明确价格）+ 价格优先撮合 + 生成 Trade + 挂单。</li>
+<li><b>不做</b>（留 C 阶段或后续）：市价单、冰山单、IOC/FOK 等高级单、盘口持久化、成交后真正扣减账户余额（那要接账户服务，是闭环的一部分，本课先让引擎独立跑通）。</li>
+</ul>
+
+<!-- ===== ③ 引导敲码 ===== -->
+<h2>③ 引导敲码（分小步，自己填方法体）</h2>
+
+<div class="anatomy">
+  <div class="step"><b>Step 1 · model.go</b><span>Order / Trade 结构</span></div>
+  <div class="step"><b>Step 2 · book.go</b><span>Book + Submit 撮合</span></div>
+  <div class="step"><b>Step 3 · handler.go</b><span>提交/查看 路由</span></div>
+  <div class="step"><b>Step 4 · 接线</b><span>main.go 挂 match</span></div>
+  <div class="step"><b>Step 5 · 跑通</b><span>两单成交验证</span></div>
+</div>
+
+<h3>Step 1 — <span class="path">internal/match/model.go</span>：订单与成交的结构</h3>
+<ul>
+<li><b>目标：</b>定义 <code>Order</code>（一笔挂单/委托）和 <code>Trade</code>（一次成交）。价格、数量都用 <code>decimal.Decimal</code>（和账户模块一致，绝不用 float）。</li>
+<li><b>骨架（只给字段，方法体/常量你来补）：</b></li>
+</ul>
+<pre><code>package match
+
+import (
+    "time"
+    "github.com/shopspring/decimal"
+)
+
+type Side string
+
+const (
+    SideBuy  Side = "buy"
+    SideSell Side = "sell"
+)
+
+type Order struct {
+    ID        string
+    UserID    string
+    Side      Side
+    Price     decimal.Decimal // 限价单的挂单价格
+    Amount    decimal.Decimal // 剩余未成交数量（撮合中会被扣减）
+    CreatedAt time.Time
+}
+
+type Trade struct {
+    ID        string
+    BuyerID   string
+    SellerID  string
+    Price     decimal.Decimal // 成交价（取挂单方价格，price-time 优先）
+    Amount    decimal.Decimal // 成交量
+    TakerSide Side            // 主动方方向，记录谁发动了这笔成交
+}</code></pre>
+<div class="req">填空提示：<code>Amount</code> 初始等于用户下单量；撮合时逐步扣减，扣到 0 表示完全成交。状态字段（挂单中/部分成交/完全成交）本课可省略，靠 <code>Amount</code> 是否为零判断即可。</div>
+
+<h3>Step 2 — <span class="path">internal/match/book.go</span>：撮合核心</h3>
+<ul>
+<li><b>目标：</b><code>Book</code> 持有 <code>bids</code> / <code>asks</code> 两个切片 + 一把锁（并发下单数）；<code>Submit(o *Order) []Trade</code> 是心脏，返回本次产生的成交；外加一个<b>只读快照 <code>Snapshot()</code></b> 供外部（handler）查看盘口——字段是不导出的，且读也要持锁。</li>
+<li><b>骨架 + 关键行（<code>Submit</code> 方法体你来填，这是本课重点；<code>Snapshot</code> 完整给出，照抄即可）：</b></li>
+</ul>
+<pre><code>type Book struct {
+    mu    sync.Mutex
+    bids  []*Order // 买盘：价格降序（出价高的在前）
+    asks  []*Order // 卖盘：价格升序（要价低的在前）
+}
+
+func New() *Book { return &Book{} }
+
+// Snapshot 只读快照：持锁拷贝一份盘口交出去（handler 的 GET /orderbook 用它）
+// 为什么不让外部直接读 b.bids / b.asks：① 封装（字段故意不导出）；② 读也要持锁；③ 别把内部切片头泄漏出去
+func (b *Book) Snapshot() (bids, asks []*Order) {
+    b.mu.Lock()
+    defer b.mu.Unlock()
+    return slices.Clone(b.bids), slices.Clone(b.asks) // 需要 import "slices"
+}
+
+// Submit 接收一笔新订单，内部撮合，返回本次产生的成交列表
+func (b *Book) Submit(o *Order) []Trade {
+    b.mu.Lock()
+    defer b.mu.Unlock()
+
+    var trades []Trade
+    // 1) 按方向取对手盘：buy 找 asks，sell 找 bids
+    // 2) 循环：只要对手盘非空 & 价格交叉，就撮一笔
+    //    - 价格交叉条件：buy → 对手 asks[0].Price <= o.Price
+    //                     sell → 对手 bids[0].Price >= o.Price
+    // 3) 每笔：tradePrice = 挂单方价格（对手盘头部那个）
+    //          tradeAmt   = min(o.Amount, 对手.Amount)
+    //          双方 Amount 减去 tradeAmt；记录 Trade 到 trades
+    //          对手 Amount 归零 → 从盘口移除（切片删除头部）
+    // 4) o.Amount 归零 → 跳出循环（主动单吃完）
+    // 5) 循环结束，o 还有剩余 → 挂入本方盘（bids 或 asks），保持排序
+    // 6) return trades
+}</code></pre>
+<div class="callout warn"><b>坑（新手必踩）：</b>① 切片删除头部用 <code>asks = asks[1:]</code>，注意这会改变底层数组，锁内操作没问题但别在锁外共享；② <b>价格比较用 <code>decimal</code> 的方法</b>（<code>a.Cmp(b) <= 0</code> 表示 a≤b），别用 <code>&lt;=</code>；③ 插入本方盘后要保持价格排序（buy 降序 / sell 升序），可用 <code>sort.Slice</code> 或插入到正确位置；④ <b>金额减法用 <code>Add</code>/<code>Sub</code></b>，不是 <code>-</code>。</div>
+
+<h3>Step 3 — <span class="path">internal/match/handler.go</span>：HTTP 接口</h3>
+<ul>
+<li><b>目标：</b>暴露提交订单、查看盘口两个接口；成交列表本课可选（想看撮合结果就加）。</li>
+<li><b>骨架：</b></li>
+</ul>
+<pre><code>type Handler struct{ book *Book }
+
+func NewHandler(b *Book) *Handler { return &Handler{book: b} }
+
+func (h *Handler) submitOrder(c *gin.Context) {
+    // 1) 解析 JSON：user_id, side, price, amount
+    // 2) 构造 *match.Order（ID 用 uuid，Amount 用 decimal.NewFromString）
+    // 3) trades := h.book.Submit(order)
+    // 4) c.JSON(200, gin.H{"order": order, "trades": trades})
+}
+
+func (h *Handler) getBook(c *gin.Context) {
+    // 通过 Book 的只读快照拿盘口（不直接碰 bids/asks 字段）
+    bids, asks := h.book.Snapshot()
+    c.JSON(200, gin.H{"bids": bids, "asks": asks})
+}
+
+func RegisterRoutes(r gin.IRouter, b *Book) {
+    h := NewHandler(b)
+    r.POST("/orders", h.submitOrder)
+    r.GET("/orderbook", h.getBook)
+}</code></pre>
+<div class="callout">注意：handler 不直接操作 <code>bids</code>/<code>asks</code> 字段（它们是 Book 内部状态）——<b>写</b>只经 <code>Submit</code>，<b>读</b>只经 <code>Snapshot</code>。这就是「封装」：别处无法绕过撮合逻辑直接改盘口，读到的也是持锁拷贝而非内部切片。</div>
+
+<h3>Step 4 — <span class="path">cmd/server/main.go</span>：挂上撮合模块</h3>
+<pre><code>matchBook := match.New()
+match.RegisterRoutes(r, matchBook) // 直接在根路由挂，或塞进 auth 组都可</code></pre>
+<p>第 2、3 课的方法签名不变，这里只是「再 Register 一行」——分层的好处再次体现：新增模块不改动旧模块。</p>
+
+<!-- ===== ④ 跑通校验 ===== -->
+<h2>④ 跑通校验</h2>
+<pre><code># 1) 先下一笔卖单（挂卖价 100，量 1）
+curl -X POST localhost:8080/orders -H 'Content-Type: application/json' \
+  -d '{"user_id":"seller","side":"sell","price":"100","amount":"1"}'
+# → trades: []，说明挂进了 asks（没对手盘）
+
+# 2) 再下一笔买单（买价 100，量 1）→ 应该和上面的卖单成交
+curl -X POST localhost:8080/orders -H 'Content-Type: application/json' \
+  -d '{"user_id":"buyer","side":"buy","price":"100","amount":"1"}'
+# → trades: [{ buyer_id:buyer, seller_id:seller, price:"100", amount:"1" }]
+#   此时 GET /orderbook 应为空（两边都吃完了）
+
+# 3) 部分成交：卖单量 2，买单量 1 → 成交 1，卖单还剩 1 挂在 asks
+curl -X POST localhost:8080/orders -H 'Content-Type: application/json' \
+  -d '{"user_id":"s1","side":"sell","price":"100","amount":"2"}'
+curl -X POST localhost:8080/orders -H 'Content-Type: application/json' \
+  -d '{"user_id":"b1","side":"buy","price":"100","amount":"1"}'
+# → 第 2 笔 trades 量=1；GET /orderbook 的 asks 里应还剩 1</code></pre>
+<div class="callout ok"><b>校验标准：</b>第 2 步产生一条成交记录、盘口清空；第 3 步产生部分成交、盘口剩 1。两者都满足，本课通过。<b>金额都是字符串</b>（<code>"100"</code>、<code>"1"</code>）——和账户模块的 decimal 序列化一致，后续接账本能直接对上。</div>
+
+<!-- ===== ⑤ 生产 reality（可选） ===== -->
+<h2>⑤ 生产 reality（⚠️ 可选扩展，不转移主线）</h2>
+<table>
+  <tr><th>主题</th><th>生产中真实做法</th><th>你现在</th></tr>
+  <tr><td>数据结构</td><td>盘口用红黑树 / 跳表 / 堆，求极值 O(1)、插入 O(log n)</td><td>切片 + 排序，小盘口够用</td></tr>
+  <tr><td>撮合精度</td><td>价格/数量 tick size 约束、整数化（用最小单位整数算）</td><td>decimal 直接算</td></tr>
+  <tr><td>持久化</td><td>盘口快照 + 成交流水落库 / Kafka，崩了可恢复</td><td>纯内存，重启即丢</td></tr>
+  <tr><td>成交 → 结算</td><td>Trade 推给账务服务，原子扣买方钱、加卖方钱</td><td>只产 Trade，不扣钱</td></tr>
+  <tr><td>风控前置</td><td>下单前校验余额/持仓/限购（C 阶段讲）</td><td>引擎不校验资金</td></tr>
+  <tr><td>性能</td><td>单簿单写锁 → 分区/无锁队列/批量撮合</td><td>一把 sync.Mutex</td></tr>
+</table>
+<div class="callout warn"><b>认知红线：</b>交易所出过的最严重事故，多半是「边界混乱」——把资金校验、限频、风控塞进撮合，导致逻辑互相污染、出 bug 时无法定位。本课刻意让引擎「又聋又哑」只管价格交叉，正是为了把边界立住。后续每一层（账户、风控、对账）都是它的「外部协作者」。</div>
+
+<div class="foot">课程根：<span class="path">minicex/</span> · 代码目录：<span class="path">minicex/project/</span> · 本课新增：<span class="path">internal/match/model.go</span>、<span class="path">internal/match/book.go</span>、<span class="path">internal/match/handler.go</span>；改动：<span class="path">cmd/server/main.go</span>（加 match.RegisterRoutes）<br/>上一课：<span class="path">0003-jwt-auth.html</span></div>
+
+</div>
+</body>
+</html>

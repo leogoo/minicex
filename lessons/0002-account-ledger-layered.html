@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>第 2 课 · 账户与账务 —— decimal 内部账本 + 分层重构</title>
+<style>
+  :root{
+    --bg:#fff; --fg:#1f2933; --muted:#5b6b7b; --line:#e3e8ee;
+    --accent:#2563eb; --accent-soft:#eaf1ff; --warn:#b45309; --warn-soft:#fff4e0;
+    --ok:#047857; --ok-soft:#e7f6ef; --code-bg:#f6f8fa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;line-height:1.7;font-size:15px}
+  .wrap{max-width:980px;margin:0 auto;padding:36px 28px 72px}
+  h1{font-size:25px;margin:0 0 6px}
+  h2{font-size:20px;margin:36px 0 12px;padding-bottom:7px;border-bottom:2px solid var(--accent);color:var(--accent)}
+  h3{font-size:16px;margin:20px 0 8px;color:#0f2d52}
+  p{margin:8px 0}
+  .sub{color:var(--muted);margin-top:0}
+  .diagram{background:#fafcff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:16px 0;text-align:center}
+  .callout{border-left:4px solid var(--accent);background:var(--accent-soft);padding:11px 15px;border-radius:0 8px 8px 0;margin:14px 0}
+  .callout.warn{border-color:var(--warn);background:var(--warn-soft)}
+  .callout.ok{border-color:var(--ok);background:var(--ok-soft)}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 11px;text-align:left;vertical-align:top}
+  th{background:var(--accent-soft);color:#0f2d52;font-weight:600}
+  tr:nth-child(even) td{background:#fafcff}
+  .tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent);margin-right:6px}
+  .tag.opt{background:var(--warn-soft);color:var(--warn)}
+  .tag.lock{background:var(--ok-soft);color:var(--ok)}
+  ol,ul{padding-left:22px} li{margin:5px 0}
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;font-size:13px;line-height:1.5}
+  code{font-family:"SFMono-Regular",Consolas,Menlo,monospace}
+  .foot{margin-top:48px;color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:14px}
+  .path{font-family:monospace;background:var(--code-bg);padding:1px 6px;border-radius:4px;color:#0f2d52}
+  .anatomy{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
+  .step{flex:1 1 170px;background:#fafcff;border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .step b{display:block;color:var(--accent);margin-bottom:4px;font-size:13px}
+  .step span{font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>第 2 课 · 账户与账务</h1>
+<p class="sub">Phase 0 巩固 CEX · 用 <code>decimal</code> 建内部账本 + 把单文件 <code>main.go</code> 重构成分层结构</p>
+
+<div class="callout ok">
+<b>本课目标：</b>跑通「开户 → 充值（mock）→ 查余额」的最小账务闭环，并学会用 <strong>decimal</strong> 处理金额。同时把代码从「一个 main.go」拆成 <strong>领域层 / HTTP 层 / 装配层</strong> 三层。
+</div>
+
+<!-- ===== ① 流程图 ===== -->
+<h2>① 流程图（本课点亮「账户/账务」）</h2>
+<div class="diagram">
+<svg viewBox="0 0 720 270" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,PingFang SC,sans-serif">
+  <defs><marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+  <rect x="20" y="110" width="90" height="50" rx="8" fill="#eef2f7" stroke="#94a3b8"/>
+  <text x="65" y="133" text-anchor="middle" font-size="12" fill="#334155">客户端</text>
+  <text x="65" y="150" text-anchor="middle" font-size="10" fill="#64748b">curl/前端</text>
+
+  <rect x="135" y="104" width="120" height="62" rx="8" fill="#eaf1ff" stroke="#2563eb"/>
+  <text x="195" y="126" text-anchor="middle" font-size="12" fill="#0f2d52" font-weight="bold">API 网关</text>
+  <text x="195" y="143" text-anchor="middle" font-size="10" fill="#2563eb">Gin 路由</text>
+  <text x="195" y="158" text-anchor="middle" font-size="9" fill="#5b6b7b">+ /ping</text>
+
+  <rect x="290" y="104" width="140" height="62" rx="8" fill="#e7f6ef" stroke="#047857" stroke-width="2"/>
+  <text x="360" y="126" text-anchor="middle" font-size="11" fill="#0f2d52" font-weight="bold">账户/账务</text>
+  <text x="360" y="143" text-anchor="middle" font-size="9" fill="#047857">internal/account</text>
+  <text x="360" y="158" text-anchor="middle" font-size="9" fill="#5b6b7b">← 本课点亮</text>
+
+  <rect x="465" y="116" width="120" height="40" rx="8" fill="#f1f5f9" stroke="#cbd5e1"/>
+  <text x="525" y="139" text-anchor="middle" font-size="10" fill="#475569">内存存储</text>
+
+  <rect x="610" y="104" width="92" height="62" rx="8" fill="#f1f5f9" stroke="#cbd5e1"/>
+  <text x="656" y="126" text-anchor="middle" font-size="10" fill="#475569">撮合</text>
+  <text x="656" y="141" text-anchor="middle" font-size="10" fill="#475569">充值</text>
+  <text x="656" y="156" text-anchor="middle" font-size="10" fill="#475569">提现…</text>
+
+  <line x1="110" y1="135" x2="133" y2="135" stroke="#475569" marker-end="url(#ar)"/>
+  <line x1="255" y1="135" x2="288" y2="135" stroke="#047857" stroke-width="2" marker-end="url(#ar)"/>
+  <line x1="430" y1="135" x2="463" y2="135" stroke="#cbd5e1" stroke-dasharray="4 3"/>
+  <line x1="410" y1="135" x2="608" y2="135" stroke="#cbd5e1" stroke-dasharray="4 3"/>
+</svg>
+</div>
+<p>本课三个接口：<code>POST /accounts</code>（开户）、<code>GET /accounts/:id/balance</code>（查余额）、<code>POST /accounts/:id/deposit</code>（内部充值，<b>先不碰链</b>，链在 Phase 4 才接）。</p>
+
+<!-- ===== ② 整体思考 ===== -->
+<h2>② 整体思考（先想清楚）</h2>
+
+<h3>1. 金额绝不能用 float</h3>
+<div class="callout warn">
+<code>0.1 + 0.2</code> 在二进制浮点里 ≠ <code>0.3</code>。金融系统用<strong>定点数</strong>表示金额（本质是整数分 / 字符串），Go 里用 <code>github.com/shopspring/decimal</code>。
+<p style="margin:6px 0 0"><b>前端类比：</b>你从不会用 <code>0.1 + 0.2 === 0.3</code> 做金额判断，而是用整数「分」或 <code>decimal.js</code>。Go 这边是同一个道理——<strong>金额字段类型一律 <code>decimal.Decimal</code>，绝不 <code>float64</code></strong>。</p>
+</div>
+
+<h3>2. 「账户」是快照，「流水」是不可变记录</h3>
+<table>
+<tr><th>概念</th><th>是什么</th><th>前端类比</th></tr>
+<tr><td><b>Account</b>（余额）</td><td>当前余额的<strong>快照</strong></td><td>React 里的 <code>state</code></td></tr>
+<tr><td><b>LedgerEntry</b>（流水）</td><td>每一笔变动的<strong>不可变记录</strong>（谁、多少、方向、时间、原因）</td><td>每次 <code>setState</code> 的 <code>action</code> 日志（Redux / event log）</td></tr>
+</table>
+<p>余额<strong>可由流水 replay 出来</strong>。生产里 Ledger 是 append-only（只追加、永不改删），它是审计、对账、回滚的唯一真相源。本课先用内存切片存流水，建立这个心智。</p>
+
+<h3>3. 为什么现在用「内存 map」而不是数据库</h3>
+<p>「跑通整体流程」优先。数据库（PostgreSQL）后面再接。但结构上要<strong>预留换存储的余地</strong>——所以业务规则放在 <code>internal/account</code>，它只依赖自己持有的 struct，不直接散落全局变量；以后把 map 换成 DB 只改这一层。</p>
+
+<h3>4. 为什么要分层</h3>
+<p>第 1 课把所有东西塞进 <code>main.go</code>，模块一多就失控。本课拆三层：</p>
+<table>
+<tr><th>层</th><th>目录</th><th>职责</th><th>前端类比</th></tr>
+<tr><td>领域层</td><td><code>internal/account</code>(model+service)</td><td>业务规则（开户/充值/余额），与 HTTP 无关，可单测</td><td>纯函数 / store</td></tr>
+<tr><td>HTTP 层</td><td><code>internal/account/handler.go</code></td><td>协议转换（JSON ↔ 调 service），<strong>按模块就近放</strong>、各自 <code>RegisterRoutes</code></td><td>controller / route handler</td></tr>
+<tr><td>装配层</td><td><code>cmd/server/main.go</code><br><small>+ <code>internal/server</code>（引擎+中间件，后续引入）</small></td><td>建引擎 → 各模块 <code>RegisterRoutes</code> → Run，<strong>不含逻辑</strong></td><td>入口装配</td></tr>
+</table>
+
+<!-- ===== ③ 引导敲码 ===== -->
+<h2>③ 引导敲码（分 5 步，每步给路径 + 目标 + 提示）</h2>
+<p>本课文件结构（在 <span class="path">minicex/project</span> 下）：</p>
+<pre><code>project/
+├── go.mod
+├── cmd/
+│   └── server/
+│       └── main.go              # 只装配：建引擎 → 各模块 RegisterRoutes → Run
+├── internal/
+│   ├── account/                 # 账户模块（自洽：model + service + handler 同包）
+│   │   ├── model.go             # Account, LedgerEntry（用 decimal）
+│   │   ├── service.go           # OpenAccount / GetBalance / Deposit（in-memory + mutex）
+│   │   └── handler.go           # Gin handlers + RegisterRoutes（按模块就近放）
+│   └── server/                 # 后续承接：引擎创建 + 全局中间件（JWT/auth，第 3 课起）</code></pre>
+
+<div class="callout warn"><b>要求：</b>下面给的是<strong>骨架（struct / 函数签名）</strong>，方法体要你自己填。目标是「理解每一行在干什么」，不是抄代码。</div>
+
+<h3>Step 1 — <span class="path">internal/account/model.go</span>：先定义数据形状</h3>
+<ul>
+<li><b>目标：</b>写出 <code>Account</code> 和 <code>LedgerEntry</code> 两个 struct，<strong>金额字段类型是 <code>decimal.Decimal</code></strong>（不是 float64）。</li>
+<li><b>骨架：</b></li>
+</ul>
+<pre><code>package account
+
+import (
+    "time"
+    "github.com/shopspring/decimal"
+)
+
+type Account struct {
+    ID        string
+    UserID    string
+    Balance   decimal.Decimal // ⚠️ 不是 float64
+    CreatedAt time.Time
+}
+
+type LedgerEntry struct {
+    ID        string
+    AccountID string
+    Amount    decimal.Decimal // 正数=入账，负数=出账
+    Type      string          // "deposit" / "withdraw"
+    Note      string
+    CreatedAt time.Time
+}</code></pre>
+<div class="callout"><b>填空提示：</b>给 <code>Account</code> 加一个 <code>Currency</code> 字段（如 <code>"USDT"</code>）——想想为什么一个用户可能要有多币种账户。</div>
+
+<h3>Step 2 — <span class="path">internal/account/service.go</span>：领域逻辑 + 存储</h3>
+<ul>
+<li><b>目标：</b>一个 <code>Service</code> struct 持有 <code>accounts map[string]*Account</code> 和 <code>ledger []LedgerEntry</code>，加 <code>sync.Mutex</code> 防并发；提供三个方法。</li>
+<li><b>骨架（方法体你来实现）：</b></li>
+</ul>
+<pre><code>package account
+
+import (
+    "sync"
+    "github.com/google/uuid" // 或自己生成 ID
+    "github.com/shopspring/decimal"
+)
+
+type Service struct {
+    mu       sync.Mutex
+    accounts map[string]*Account
+    ledger   []LedgerEntry
+}
+
+func New() *Service { /* 初始化 map 并返回 */ }
+
+func (s *Service) OpenAccount(userID string) *Account { /* 余额从 0 起 */ }
+
+func (s *Service) GetBalance(id string) (decimal.Decimal, error) { /* 不存在返回 error */ }
+
+func (s *Service) Deposit(id string, amt decimal.Decimal, note string) (*LedgerEntry, error) {
+    // 思路：1) 加锁  2) 查账户，不存在报错
+    //       3) Balance = Balance.Add(amt)   4) 追加一条 LedgerEntry
+    //       5) 解锁并返回
+}</code></pre>
+<div class="callout"><b>Go 小提示：</b>decimal 加法是 <code>balance.Add(amt)</code>，<strong>不是</strong> <code>+</code>；校验金额可用 <code>amt.IsNegative()</code>。并发读写 map 会 panic，所以每个方法进出都要 <code>mu.Lock()</code> / <code>mu.Unlock()</code>（或用 <code>defer mu.Unlock()</code>）。</div>
+
+<h3>Step 3 — <span class="path">internal/account/handler.go</span>：HTTP 适配（按模块就近放）</h3>
+<ul>
+<li><b>目标：</b>三个 Gin handler，把请求 JSON ↔ 调 Service，返回 JSON。handler 与 service <strong>同属 <code>package account</code></strong>（模块自洽），不写业务规则，只做协议转换 + 挂路由。</li>
+<li><b>骨架：</b></li>
+</ul>
+<pre><code>package account   // ⚠️ 和 service.go 同包，不再单独开 server 包
+
+import "github.com/gin-gonic/gin"
+
+type Handler struct{ svc *Service }   // 同包内直接用 *Service，无需 import
+
+func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
+
+// 模块自己把路由挂上去，main.go 只调用这一行
+func RegisterRoutes(r gin.IRouter, svc *Service) {
+    h := NewHandler(svc)
+    r.POST("/accounts", h.OpenAccount)
+    r.GET("/accounts/:id/balance", h.GetBalance)
+    r.POST("/accounts/:id/deposit", h.Deposit)
+}
+
+func (h *Handler) OpenAccount(c *gin.Context) { /* POST /accounts */ }
+func (h *Handler) GetBalance(c *gin.Context)  { /* GET /accounts/:id/balance */ }
+func (h *Handler) Deposit(c *gin.Context)     { /* POST /accounts/:id/deposit */ }</code></pre>
+<div class="callout"><b>填空提示：</b>用 <code>c.ShouldBindJSON(&amp;req)</code> 收 JSON 体、<code>c.Param("id")</code> 取路径参数、<code>c.JSON(status, data)</code> 回包。金额从 JSON 进来时是字符串（如 <code>"10.5"</code>），用 <code>decimal.NewFromString()</code> 解析。handler 与 service 同包，可直接访问 <code>svc</code> 的私有字段；模块变大、handler 很多时，可把 HTTP 部分拆成 <code>account/http/</code> 子包隔离（可选）。</div>
+
+<h3>Step 4 — <span class="path">cmd/server/main.go</span>：只装配</h3>
+<ul>
+<li><b>目标：</b>把 service 和 handler 连起来、挂路由、Run。第 1 课的 <code>main.go</code> 整体替换为这个分层版本（<code>/ping</code> 可保留可删）。</li>
+<li><b>骨架：</b></li>
+</ul>
+<pre><code>package main
+
+import (
+    "github.com/gin-gonic/gin"
+    "minicex/internal/account"
+)
+
+func main() {
+    svc := account.New()
+
+    r := gin.Default()
+    account.RegisterRoutes(r, svc)   // 每模块各自挂载，加模块只多一行
+    r.Run(":8080")
+}</code></pre>
+<div class="callout"><b>为什么这样拆：</b>handler 不再集中到 <code>internal/server</code>，而是每个模块自带 <code>RegisterRoutes</code>。以后加 match / deposit / withdraw 模块，main.go 只是多一行 <code>xxx.RegisterRoutes(r, svc)</code>，不会退化成上帝文件。<code>internal/server</code> 这个包保留给「引擎创建 + 全局中间件（JWT 等）」，到第 3 课接入鉴权时再引入。</div>
+
+<h3>Step 5 — 跑起来 & 拉依赖</h3>
+<ul>
+<li><b>命令：</b>在 <span class="path">project</span> 下执行 <code>go mod tidy &amp;&amp; go run ./cmd/server</code>。</li>
+<li><code>go mod tidy</code> 会自动把 <code>gin</code>、<code>decimal</code>、<code>uuid</code> 写进 <span class="path">go.mod</span>。看到 <code>Listening and serving HTTP on :8080</code> 即成功。</li>
+</ul>
+
+<!-- ===== ④ 跑通校验 ===== -->
+<h2>④ 跑通校验</h2>
+<p>另开终端，三连击：</p>
+<pre><code># 1) 开户
+curl -X POST localhost:8080/accounts -H 'Content-Type: application/json' -d '{"user_id":"u1"}'
+# → {"id":"...","user_id":"u1","balance":"0","currency":"USDT"}
+
+# 2) 充值 10.5（mock，不走链）
+curl -X POST localhost:8080/accounts/<ID>/deposit -H 'Content-Type: application/json' -d '{"amount":"10.5","note":"test"}'
+# → {"amount":"10.5",...}
+
+# 3) 查余额
+curl localhost:8080/accounts/<ID>/balance
+# → {"balance":"10.5"}</code></pre>
+<div class="callout ok"><b>跑通标准：</b>balance 返回的是<strong>字符串</strong> <code>"10.5"</code>，不是浮点 <code>10.5</code>。✅ 这一步确认 decimal 生效——这是后面链上充值/对账安全对齐的基石。</div>
+
+<!-- ===== ⑤ 生产 reality ===== -->
+<h2>⑤ 生产 reality（⚠️ 可选扩展，留到 C 阶段）</h2>
+<div class="callout warn">知道「真实环境还会考虑这些」即可，<strong>本课不深挖</strong>。</div>
+<ul>
+<li><b>金额序列化：</b>decimal 默认 JSON 是字符串，前端要按字符串处理；或自定义 <code>MarshalJSON</code> 成整数「分」避免精度歧义。</li>
+<li><b>并发边界：</b>mutex 只在单进程有效；多实例要换 <strong>DB 事务 / 行锁</strong>（PostgreSQL <code>UPDATE ... SET balance = balance + $1</code>）。</li>
+<li><b>流水不可变：</b>生产里 Ledger 是 append-only 表，绝不允许 UPDATE/DELETE，余额由流水推导。</li>
+<li><b>账户隔离：</b>一个用户多币种 = 多个 Account（或 account 加 currency 维度），资金调拨要走内部转账流水。</li>
+<li><b>ID 生成：</b>本课用 uuid 图省事；生产多用雪花 ID（有序、利于索引）。</li>
+</ul>
+
+<div class="callout"><b>下一课（第 3 课）：</b>接入 <b>JWT 鉴权</b>——给接口加上「你是谁」的验证（≈ 前端路由守卫），并把「已登录用户」挂到请求上下文，为后面充值/提现的身份校验打底。</div>
+
+<div class="foot">课程根：<span class="path">minicex/</span> · 代码目录：<span class="path">minicex/project/</span> · 本课新增：<span class="path">internal/account/{model,service,handler}.go</span>（handler 按模块就近放）、<span class="path">cmd/server/main.go</span></div>
+</div>
+</body>
+</html>

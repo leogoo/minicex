@@ -12,3 +12,13 @@
 10. **前端类比**：善用前端概念类比（JWT≈路由守卫、goroutine≈async、限流≈throttle、幂等≈请求去重、Gin handler≈controller、middleware≈Express/Koa 中间件）帮助理解。
 11. **语言 / 格式**：中文为主；每课一份独立 HTML 存 `lessons/`（干净排版，Tufte 风格）。
 12. **全新项目**：从零搭一个最小 Web3 交易所后端，不复用此前任何课程 / 项目代码。
+13. **骨架不得悬空引用（重点）**：凡是课程骨架里出现的调用，必须在同一课给出被调用方的**方法定义 / 签名**（内部未导出方法同样要求）。方法体可以留白让学习者填，但签名与用途必须写明——否则学习者会卡在"这方法哪来的"。引出未定义的方法 = 课程 bug，需当场补齐（如第 4 课补 `Book.Snapshot()`）。
+
+---
+
+## 目录结构约定（模块式，用户确认）
+
+- 每个业务域一个 `internal/<module>/` 包，**自带 model.go + service.go + handler.go（同 package）**，并暴露 `RegisterRoutes(r, svc)` 自挂载路由。
+- `cmd/server/main.go` 只做装配：建引擎 → 各模块 `RegisterRoutes` → Run，不写逻辑。
+- `internal/server` 留给「引擎创建 + 全局中间件（JWT/auth）」，**不装具体 handler**。
+- 禁止 `internal/server/handler.go` 这种按技术角色集中堆放——多模块后会退化成上帝文件。按模块就近放才能 scale（account / match / deposit / withdraw / reconcile）。

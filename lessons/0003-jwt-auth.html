@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>第 3 课 · JWT 鉴权 —— 把「已登录用户」挂进请求上下文</title>
+<style>
+  :root{
+    --bg:#fff; --fg:#1f2933; --muted:#5b6b7b; --line:#e3e8ee;
+    --accent:#2563eb; --accent-soft:#eaf1ff; --warn:#b45309; --warn-soft:#fff4e0;
+    --ok:#047857; --ok-soft:#e7f6ef; --code-bg:#f6f8fa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;line-height:1.7;font-size:15px}
+  .wrap{max-width:980px;margin:0 auto;padding:36px 28px 72px}
+  h1{font-size:25px;margin:0 0 6px}
+  h2{font-size:20px;margin:36px 0 12px;padding-bottom:7px;border-bottom:2px solid var(--accent);color:var(--accent)}
+  h3{font-size:16px;margin:20px 0 8px;color:#0f2d52}
+  p{margin:8px 0}
+  .sub{color:var(--muted);margin-top:0}
+  .diagram{background:#fafcff;border:1px solid var(--line);border-radius:12px;padding:16px;margin:16px 0;text-align:center}
+  .callout{border-left:4px solid var(--accent);background:var(--accent-soft);padding:11px 15px;border-radius:0 8px 8px 0;margin:14px 0}
+  .callout.warn{border-color:var(--warn);background:var(--warn-soft)}
+  .callout.ok{border-color:var(--ok);background:var(--ok-soft)}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:9px 11px;text-align:left;vertical-align:top}
+  th{background:var(--accent-soft);color:#0f2d52;font-weight:600}
+  tr:nth-child(even) td{background:#fafcff}
+  .tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent);margin-right:6px}
+  .tag.opt{background:var(--warn-soft);color:var(--warn)}
+  .tag.lock{background:var(--ok-soft);color:var(--ok)}
+  ol,ul{padding-left:22px} li{margin:5px 0}
+  pre{background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;font-size:13px;line-height:1.5}
+  code{font-family:"SFMono-Regular",Consolas,Menlo,monospace}
+  .foot{margin-top:48px;color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:14px}
+  .path{font-family:monospace;background:var(--code-bg);padding:1px 6px;border-radius:4px;color:#0f2d52}
+  .anatomy{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
+  .step{flex:1 1 170px;background:#fafcff;border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .step b{display:block;color:var(--accent);margin-bottom:4px;font-size:13px}
+  .step span{font-size:13px;color:var(--muted)}
+  .req{border-left:4px solid var(--ok);background:var(--ok-soft);padding:10px 14px;border-radius:0 8px 8px 0;margin:12px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>第 3 课 · JWT 鉴权</h1>
+<p class="sub">Phase 0 巩固 CEX · 把「已登录用户」挂进请求上下文，为充值 / 提现的身份校验打底</p>
+
+<div class="callout ok">
+<b>本课目标：</b>给服务加一层<b>鉴权中间件</b>——客户端登录拿到 token，之后每个请求在 <code>Authorization</code> 头带上它，中间件验签通过就把 <code>user_id</code> 注入请求上下文，handler 直接取用。本课<b>不写业务</b>，只立「身份从哪来」这跟柱子。
+</div>
+
+<!-- ===== ① 流程图 ===== -->
+<h2>① 流程图（本课点亮「鉴权」横切层）</h2>
+<div class="diagram">
+<svg viewBox="0 0 720 300" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,PingFang SC,sans-serif">
+  <defs><marker id="ar3" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#475569"/></marker></defs>
+
+  <rect x="20" y="130" width="90" height="50" rx="8" fill="#eef2f7" stroke="#94a3b8"/>
+  <text x="65" y="153" text-anchor="middle" font-size="12" fill="#334155">客户端</text>
+  <text x="65" y="170" text-anchor="middle" font-size="10" fill="#64748b">curl/前端</text>
+
+  <!-- login 支线 -->
+  <rect x="135" y="40" width="120" height="44" rx="8" fill="#fff4e0" stroke="#b45309"/>
+  <text x="195" y="60" text-anchor="middle" font-size="11" fill="#b45309" font-weight="bold">POST /login</text>
+  <text x="195" y="76" text-anchor="middle" font-size="9" fill="#5b6b7b">发 token</text>
+  <line x1="65" y1="140" x2="135" y2="62" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#ar3)"/>
+
+  <rect x="135" y="130" width="120" height="50" rx="8" fill="#eaf1ff" stroke="#2563eb"/>
+  <text x="195" y="153" text-anchor="middle" font-size="11" fill="#0f2d52" font-weight="bold">API 网关</text>
+  <text x="195" y="170" text-anchor="middle" font-size="9" fill="#2563eb">Gin 路由</text>
+
+  <!-- 中间件 -->
+  <rect x="290" y="120" width="145" height="70" rx="8" fill="#e7f6ef" stroke="#047857" stroke-width="2"/>
+  <text x="362" y="143" text-anchor="middle" font-size="11" fill="#0f2d52" font-weight="bold">Auth 中间件</text>
+  <text x="362" y="160" text-anchor="middle" font-size="9" fill="#047857">internal/server</text>
+  <text x="362" y="175" text-anchor="middle" font-size="9" fill="#5b6b7b">验签 + c.Set</text>
+
+  <rect x="470" y="130" width="120" height="50" rx="8" fill="#f1f5f9" stroke="#cbd5e1"/>
+  <text x="530" y="153" text-anchor="middle" font-size="11" fill="#334155" font-weight="bold">业务 Handler</text>
+  <text x="530" y="170" text-anchor="middle" font-size="9" fill="#64748b">c.Get(user_id)</text>
+
+  <rect x="615" y="130" width="92" height="50" rx="8" fill="#f1f5f9" stroke="#cbd5e1"/>
+  <text x="661" y="153" text-anchor="middle" font-size="10" fill="#475569">账户/账务</text>
+  <text x="661" y="170" text-anchor="middle" font-size="9" fill="#64748b">等模块</text>
+
+  <!-- 主流程箭头 -->
+  <line x1="155" y1="155" x2="282" y2="155" stroke="#475569" stroke-width="1.5" marker-end="url(#ar3)"/>
+  <line x1="435" y1="155" x2="465" y2="155" stroke="#475569" stroke-width="1.5" marker-end="url(#ar3)"/>
+  <line x1="590" y1="155" x2="613" y2="155" stroke="#475569" stroke-width="1.5" marker-end="url(#ar3)"/>
+
+  <text x="362" y="228" text-anchor="middle" font-size="10" fill="#64748b">token 存客户端（localStorage / 内存），服务端无 session —— 这就是「无状态」</text>
+  <text x="362" y="248" text-anchor="middle" font-size="10" fill="#64748b">带 token: Bearer &lt;jwt&gt;  → 200 ｜ 不带/过期: 401</text>
+</svg>
+</div>
+
+<!-- ===== ② 整体思考 ===== -->
+<h2>② 整体思考（先想清楚再敲）</h2>
+
+<h3>JWT 是什么</h3>
+<p>JWT（JSON Web Token）是一串 <code>aaa.bbb.ccc</code> 三段 base64：<b>header.claims.signature</b>。服务端用密钥对前两段签名，客户端拿着整串；服务端收到后验签，签名对就信任里面的内容。它<b>不需要在服务端存 session</b>——这就是「无状态鉴权」，对横向扩容的交易所后端很关键。</p>
+
+<table>
+  <tr><th>前端类比</th><th>JWT 对应物</th><th>说明</th></tr>
+  <tr><td>路由守卫 <code>router.beforeEach</code></td><td>Gin 中间件 <code>AuthRequired()</code></td><td>每个请求前的统一关卡</td></tr>
+  <tr><td>登录后存 <code>localStorage</code> 的 token</td><td>客户端持有的 JWT</td><td>都靠客户端携带，服务端不存</td></tr>
+  <tr><td>守卫里 parse token 拿 <code>userInfo</code> 注入路由</td><td><code>c.Set("user_id", uid)</code> + handler 里 <code>c.Get</code></td><td>身份沿请求链路往下传</td></tr>
+  <tr><td>守卫失败 <code>next('/login')</code></td><td><code>c.AbortWithStatusJSON(401, ...)</code></td><td>拦截并回 401</td></tr>
+</table>
+
+<h3>落点：为什么进 <code>internal/server</code></h3>
+<p>第 2 课我们约定：<code>internal/server</code> 是「<b>引擎 + 全局中间件</b>」层，<b>不装具体业务 handler</b>。JWT 恰恰是<b>横切所有模块</b>的基础设施（账户、充值、提现都要验身份），所以它是 <code>internal/server</code> 的天然住户，和账户模块各司其职。</p>
+
+<div class="callout">
+<b>关键边界（记牢）：</b>中间件只做两件事 —— <b>① 验签名</b>、<b>② 把 user_id 注入 ctx</b>。<b>不做任何业务判断</b>。至于「这个 user 能不能提现 100 万」那种规则，是风控层（C 阶段）的事，不是鉴权层。
+</div>
+
+<h3>本课怎么和账户模块接上</h3>
+<p>第 2 课账户接口是用路径里的 <code>account_id</code> 定位的。鉴权进来后，正确做法是：<b>token 解出 user_id → 由 user_id 找到 account_id</b>。现在内存里 <code>Account</code> 已经带了 <code>UserID</code> 字段，所以「user→account 映射」天然成立。本课<b>只先打通中间件 + ctx 注入</b>，handler 里演示怎么取 <code>user_id</code>；要不要把账户接口全改成「凭 user_id 定位」属于后续重构，不转移本课重心。</p>
+
+<!-- ===== ③ 引导敲码 ===== -->
+<h2>③ 引导敲码（分小步，自己填方法体）</h2>
+
+<div class="anatomy">
+  <div class="step"><b>Step 1 · 加依赖</b><span><code>go get github.com/golang-jwt/jwt/v5</code></span></div>
+  <div class="step"><b>Step 2 · jwt.go</b><span>internal/server 下：发 & 解 token</span></div>
+  <div class="step"><b>Step 3 · middleware.go</b><span>AuthRequired 中间件</span></div>
+  <div class="step"><b>Step 4 · 接线</b><span>main.go 路由组 + /login</span></div>
+  <div class="step"><b>Step 5 · handler 取</b><span>c.Get("user_id")</span></div>
+</div>
+
+<h3>Step 2 — <span class="path">internal/server/jwt.go</span>：发 token 与解 token</h3>
+<ul>
+<li><b>目标：</b>两个函数——<code>GenerateToken(userID string) (string, error)</code> 用密钥签名产出 token；<code>ParseToken(token string) (userID string, err error)</code> 验签并取出 userID。</li>
+<li><b>骨架（只给签名 + 关键行，方法体你来填）：</b></li>
+</ul>
+<pre><code>package server
+
+import (
+    "time"
+    "github.com/golang-jwt/jwt/v5"
+)
+
+// 密钥先放常量，生产要进环境变量/Secret（见 ⑤）
+var jwtSecret = []byte("dev-only-change-me")
+
+type claims struct {
+    UserID string `json:"uid"`
+    jwt.RegisteredClaims
+}
+
+func GenerateToken(userID string) (string, error) {
+    // 1) 构造 claims：塞入 userID + 过期时间(如 2h)
+    // 2) jwt.NewWithClaims(jwt.SigningMethodHS256, c)
+    // 3) .SignedString(jwtSecret)
+}
+
+func ParseToken(token string) (string, error) {
+    // 1) jwt.ParseWithClaims(token, &claims{}, func(t *jwt.Token) (interface{}, error) { return jwtSecret, nil })
+    // 2) 检查 err（过期/篡改都在这报）
+    // 3) 从 claims.UserID 取出返回
+}</code></pre>
+<div class="req">填空提示：过期用 <code>jwt.NewRegisteredClaims</code> 的 <code>ExpiresAt: jwt.NewNumericDate(time.Now().Add(2 * time.Hour))</code>；HS256 是对称签名，密钥同一把。</div>
+
+<h3>Step 3 — <span class="path">internal/server/middleware.go</span>：AuthRequired 中间件</h3>
+<ul>
+<li><b>目标：</b>返回 <code>gin.HandlerFunc</code>。从 <code>Authorization</code> 头取 <code>Bearer &lt;token&gt;</code>，验签，失败 401 并中断；成功把 user_id 注入 ctx 再放行。</li>
+<li><b>骨架 + 关键行：</b></li>
+</ul>
+<pre><code>func AuthRequired() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        // 1) h := c.GetHeader("Authorization")，去掉 "Bearer " 前缀
+        // 2) uid, err := ParseToken(token)；err != nil → c.AbortWithStatusJSON(401, ...) 并 return
+        // 3) c.Set("user_id", uid)   // 注入请求上下文
+        // 4) c.Next()                // 放行给下一个 handler
+    }
+}</code></pre>
+<div class="callout warn"><b>坑：</b>头可能是空、或没有 <code>Bearer </code> 前缀、或 token 过期。三种都要在 <code>err != nil</code> 分支统一回 401，别让 panic 漏出去。</div>
+
+<h3>Step 4 — <span class="path">cmd/server/main.go</span>：挂中间件 + 临时 /login</h3>
+<ul>
+<li><b>目标：</b>用路由组把受保护接口圈起来；加一个临时 <code>POST /login</code>（mock：收 user_id 直接发 token，接真实用户系统前先用它跑通）。</li>
+<li><b>关键示意（片段，不是整文件）：</b></li>
+</ul>
+<pre><code>r := gin.Default()
+
+// 临时登录：拿到 token 用，后面接真实用户库
+r.POST("/login", func(c *gin.Context) {
+    var req struct{ UserID string `json:"user_id"` }
+    c.ShouldBindJSON(&req)
+    token, _ := server.GenerateToken(req.UserID)
+    c.JSON(200, gin.H{"token": token})
+})
+
+// 受保护组：下面所有路由都要过鉴权
+auth := r.Group("/api")
+auth.Use(server.AuthRequired())
+account.RegisterRoutes(auth, accountSvc)  // 第2课的方法，签名不变</code></pre>
+<div class="callout">注意：<code>account.RegisterRoutes</code> 签名不用改，因为鉴权发生在它<b>之前</b>（中间件层），handler 内部才去 <code>c.Get</code>。这正是分层的好处——加鉴权不必动每个 handler 的注册。</div>
+
+<h3>Step 5 — 在 handler 里取身份</h3>
+<p>账户 handler（或任何模块）想拿当前用户，不再靠请求体传，而是：</p>
+<pre><code>uid, _ := c.Get("user_id")          // 中间件注入的
+// 之后用 uid 做定位 / 写流水 / 风控校验</code></pre>
+<p>第 2 课你写的 <code>GetBalance</code> / <code>Deposit</code> 现在可以顺势改成「凭 uid 找账户」——但本课只要求你<b>理解并能取出 uid</b>，要不要全量重构账户接口交给你决定，不强制。</p>
+
+<!-- ===== ④ 跑通校验 ===== -->
+<h2>④ 跑通校验</h2>
+<pre><code># 1) 登录拿 token
+TOKEN=$(curl -s -X POST localhost:8080/login -H 'Content-Type: application/json' \
+  -d '{"user_id":"u1"}' | python3 -c "import sys,json;print(json.load(sys.stdin)['token'])")
+
+# 2) 带 token 访问受保护接口 → 期望 200
+curl -H "Authorization: Bearer $TOKEN" localhost:8080/api/accounts/u1/balance
+
+# 3) 不带 token → 期望 401
+curl localhost:8080/api/accounts/u1/balance</code></pre>
+<div class="callout ok"><b>校验标准：</b>第 2 步返回余额 JSON；第 3 步返回 <code>401</code> 且被中间件拦截（不会打到 handler）。两者都满足，本课通过。</div>
+
+<!-- ===== ⑤ 生产 reality（可选） ===== -->
+<h2>⑤ 生产 reality（⚠️ 可选扩展，不转移主线）</h2>
+<table>
+  <tr><th>主题</th><th>生产中真实做法</th><th>你现在</th></tr>
+  <tr><td>密钥管理</td><td>进 KMS / Secret Manager / env，<b>绝不</b>硬编码进代码或进 git</td><td>常量占位，记住要换</td></tr>
+  <tr><td>算法</td><td>内部服务用 HS256 够；对外/多方可换 RS256（非对称，公钥验签）</td><td>HS256</td></tr>
+  <tr><td>续期</td><td>access token 短命 + refresh token 换发</td><td>单 token 2h</td></tr>
+  <tr><td>注销 / 风控</td><td>token 黑名单（Redis）、异常登录直接让中间件拒掉</td><td>无</td></tr>
+  <tr><td>防重放</td><td>jti + Redis 去重，或 nonce 时间戳</td><td>无</td></tr>
+  <tr><td>传输</td><td>必须 HTTPS；Bearer 头别落日志</td><td>本地 http</td></tr>
+</table>
+<div class="callout warn"><b>安全红线：</b>① 别用 <code>SigningMethodNone</code>（任何人都可伪造）；② HS256 的密钥要够长够随机；③ 验签时务必显式校验算法，防止「算法混淆」攻击（golang-jwt v5 默认已校验，但要知道这回事）。这些留到 C 阶段深讲。</div>
+
+<div class="foot">课程根：<span class="path">minicex/</span> · 代码目录：<span class="path">minicex/project/</span> · 本课新增：<span class="path">internal/server/jwt.go</span>、<span class="path">internal/server/middleware.go</span>；改动：<span class="path">cmd/server/main.go</span>（加路由组 + /login）<br/>上一课：<span class="path">0002-account-ledger-layered.html</span></div>
+
+</div>
+</body>
+</html>
